@@ -1,28 +1,45 @@
 import streamlit as st
-from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 st.set_page_config(page_title="Traductor Aymara ↔ Español", page_icon="🌍")
 
-st.title("🌍 Traductor Automático")
-st.write("Traduce texto entre Aymara y Español con tu modelo personalizado.")
+st.title("🌍 Traductor Aymara ↔ Español")
+st.write("Traduce textos entre Español y Aymara usando tu modelo fine-tuned de Hugging Face.")
 
-# --- Carga del modelo ---
 @st.cache_resource
 def load_model():
-    model_name = "TU_USUARIO/TU_MODELO"  # Ruta a tu modelo
+    model_name = "MarielaNina/nllb-200-600-spanish-aimara-finetuned"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    translator = pipeline("translation", model=model, tokenizer=tokenizer)
-    return translator
+    return tokenizer, model
 
-translator = load_model()
+tokenizer, model = load_model()
 
-# --- Interfaz de usuario ---
-input_text = st.text_area("Introduce el texto:", "")
+direccion = st.selectbox(
+    "Selecciona la dirección de traducción:",
+    ("Español → Aymara", "Aymara → Español")
+)
+
+texto = st.text_area("Ingresa el texto a traducir:")
 
 if st.button("Traducir"):
-    if input_text.strip():
-        resultado = translator(input_text)
-        st.success(resultado[0]['translation_text'])
+    if texto.strip():
+        inputs = tokenizer(texto, return_tensors="pt")
+
+        # Define forced_bos_token_id según dirección
+        if direccion == "Español → Aymara":
+            forced_bos_token_id = tokenizer.convert_tokens_to_ids("ayr_Latn")
+        else:
+            forced_bos_token_id = tokenizer.convert_tokens_to_ids("spa_Latn")
+
+        outputs = model.generate(
+            **inputs,
+            forced_bos_token_id=forced_bos_token_id
+        )
+
+        traduccion = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+        st.write("**Traducción:**")
+        st.success(traduccion)
     else:
-        st.warning("Por favor ingresa un texto.")
+        st.warning("Por favor ingresa un texto para traducir.")
